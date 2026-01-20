@@ -1,19 +1,27 @@
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { RequestCard } from "@/components/RequestCard";
 import { Button } from "@/components/ui/Button";
+import { DEMO_USER } from "@/lib/demo-user";
+
+export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const session = await auth();
-  if (!session?.user) {
-    redirect("/login");
-  }
+  // Ensure demo user exists
+  await prisma.user.upsert({
+    where: { email: DEMO_USER.email },
+    update: {},
+    create: {
+      id: DEMO_USER.id,
+      email: DEMO_USER.email,
+      name: DEMO_USER.name,
+      role: DEMO_USER.role,
+    },
+  });
 
   // Fetch user's requests
   const myRequests = await prisma.request.findMany({
-    where: { requesterId: session.user.id },
+    where: { requesterId: DEMO_USER.id },
     orderBy: { createdAt: "desc" },
     take: 10,
   });
@@ -21,7 +29,7 @@ export default async function DashboardPage() {
   // Fetch requests user is fulfilling
   const fulfilling = await prisma.request.findMany({
     where: {
-      fulfillerId: session.user.id,
+      fulfillerId: DEMO_USER.id,
       status: { in: ["CLAIMED", "FULFILLED"] },
     },
     orderBy: { claimedAt: "desc" },
@@ -30,20 +38,18 @@ export default async function DashboardPage() {
 
   // Stats
   const totalRequests = await prisma.request.count({
-    where: { requesterId: session.user.id },
+    where: { requesterId: DEMO_USER.id },
   });
 
   const totalFulfilled = await prisma.request.count({
-    where: { fulfillerId: session.user.id, status: "COMPLETED" },
+    where: { fulfillerId: DEMO_USER.id, status: "COMPLETED" },
   });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600">
-          Welcome back, {session.user.name || session.user.email}
-        </p>
+        <p className="text-gray-600">Welcome, {DEMO_USER.name}</p>
       </div>
 
       {/* Stats */}

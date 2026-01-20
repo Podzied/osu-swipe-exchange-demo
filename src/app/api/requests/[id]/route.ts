@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { DEMO_USER } from "@/lib/demo-user";
 
 // GET /api/requests/[id] - Get a single request
 export async function GET(
@@ -8,11 +8,6 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { id } = await params;
 
     const request = await prisma.request.findUnique({
@@ -47,11 +42,6 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { id } = await params;
     const body = await req.json();
     const { action } = body;
@@ -67,10 +57,6 @@ export async function PATCH(
     // Handle different actions
     switch (action) {
       case "cancel":
-        // Only requester can cancel their own request
-        if (request.requesterId !== session.user.id) {
-          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
         if (request.status !== "OPEN") {
           return NextResponse.json(
             { error: "Can only cancel open requests" },
@@ -84,10 +70,6 @@ export async function PATCH(
         break;
 
       case "complete":
-        // Only requester can mark as completed
-        if (request.requesterId !== session.user.id) {
-          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
         if (request.status !== "FULFILLED") {
           return NextResponse.json(
             { error: "Request must be fulfilled before completing" },
@@ -101,10 +83,6 @@ export async function PATCH(
         break;
 
       case "release":
-        // Only fulfiller can release a claimed request
-        if (request.fulfillerId !== session.user.id) {
-          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
         if (request.status !== "CLAIMED") {
           return NextResponse.json(
             { error: "Can only release claimed requests" },

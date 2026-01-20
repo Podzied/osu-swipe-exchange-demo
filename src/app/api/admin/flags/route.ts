@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
 
 // GET /api/admin/flags - Get all flags
 export async function GET(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
 
@@ -33,15 +29,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/admin/flags - Create a flag (for abuse detection)
+// POST /api/admin/flags - Create a flag
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth();
-    // This could be called by the system or by an admin
-    if (!session?.user || session.user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
     const body = await req.json();
     const { userId, type, reason } = body;
 

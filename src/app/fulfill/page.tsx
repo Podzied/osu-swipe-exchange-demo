@@ -1,28 +1,33 @@
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { redirect } from "next/navigation";
 import { RequestCard } from "@/components/RequestCard";
+import { DEMO_USER } from "@/lib/demo-user";
+
+export const dynamic = "force-dynamic";
 
 export default async function FulfillPage() {
-  const session = await auth();
-  if (!session?.user) {
-    redirect("/login");
-  }
+  // Ensure demo user exists
+  await prisma.user.upsert({
+    where: { email: DEMO_USER.email },
+    update: {},
+    create: {
+      id: DEMO_USER.id,
+      email: DEMO_USER.email,
+      name: DEMO_USER.name,
+      role: DEMO_USER.role,
+    },
+  });
 
-  // Fetch open requests (excluding user's own)
+  // Fetch all open requests
   const openRequests = await prisma.request.findMany({
     where: {
       status: "OPEN",
-      requesterId: { not: session.user.id },
-      expiresAt: { gt: new Date() },
     },
     orderBy: { createdAt: "asc" }, // FIFO
   });
 
-  // Fetch requests this user is currently fulfilling
+  // Fetch requests being fulfilled (by demo fulfiller)
   const myFulfillments = await prisma.request.findMany({
     where: {
-      fulfillerId: session.user.id,
       status: { in: ["CLAIMED", "FULFILLED"] },
     },
     orderBy: { claimedAt: "desc" },
@@ -41,7 +46,7 @@ export default async function FulfillPage() {
       {myFulfillments.length > 0 && (
         <div className="mb-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Your Active Fulfillments
+            Active Fulfillments
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {myFulfillments.map((request) => (

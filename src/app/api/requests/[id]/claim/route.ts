@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { RATE_LIMITS, DINING_LOCATIONS } from "@/lib/constants";
+import { DEMO_USER } from "@/lib/demo-user";
+
+// Use a second demo user for fulfilling to show the flow
+const DEMO_FULFILLER = {
+  id: "demo-fulfiller-1",
+  email: "fulfiller@example.com",
+  name: "Demo Fulfiller",
+  role: "USER",
+};
 
 // POST /api/requests/[id]/claim - Claim or fulfill a request
 export async function POST(
@@ -9,10 +17,17 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Ensure demo fulfiller exists
+    await prisma.user.upsert({
+      where: { email: DEMO_FULFILLER.email },
+      update: {},
+      create: {
+        id: DEMO_FULFILLER.id,
+        email: DEMO_FULFILLER.email,
+        name: DEMO_FULFILLER.name,
+        role: DEMO_FULFILLER.role,
+      },
+    });
 
     const { id } = await params;
     const body = await req.json();
@@ -26,14 +41,6 @@ export async function POST(
       return NextResponse.json({ error: "Request not found" }, { status: 404 });
     }
 
-    // Can't claim your own request
-    if (request.requesterId === session.user.id) {
-      return NextResponse.json(
-        { error: "You cannot fulfill your own request" },
-        { status: 400 }
-      );
-    }
-
     if (action === "claim") {
       if (request.status !== "OPEN") {
         return NextResponse.json(
@@ -42,29 +49,11 @@ export async function POST(
         );
       }
 
-      // Check claim rate limit
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const claimsToday = await prisma.request.count({
-        where: {
-          fulfillerId: session.user.id,
-          claimedAt: { gte: today },
-        },
-      });
-
-      if (claimsToday >= RATE_LIMITS.MAX_CLAIMS_PER_DAY) {
-        return NextResponse.json(
-          { error: `You can only claim ${RATE_LIMITS.MAX_CLAIMS_PER_DAY} requests per day` },
-          { status: 429 }
-        );
-      }
-
       await prisma.request.update({
         where: { id },
         data: {
           status: "CLAIMED",
-          fulfillerId: session.user.id,
+          fulfillerId: DEMO_FULFILLER.id,
           claimedAt: new Date(),
         },
       });
@@ -73,13 +62,6 @@ export async function POST(
         return NextResponse.json(
           { error: "Request must be claimed first" },
           { status: 400 }
-        );
-      }
-
-      if (request.fulfillerId !== session.user.id) {
-        return NextResponse.json(
-          { error: "Only the claimer can fulfill this request" },
-          { status: 403 }
         );
       }
 

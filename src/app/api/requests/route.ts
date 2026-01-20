@@ -1,17 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generatePickupAlias } from "@/lib/alias";
 import { RATE_LIMITS } from "@/lib/constants";
+import { DEMO_USER } from "@/lib/demo-user";
 
 // GET /api/requests - Get requests (optionally filtered)
 export async function GET(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
     const type = searchParams.get("type"); // "my" or "open"
@@ -19,12 +14,12 @@ export async function GET(req: NextRequest) {
     let whereClause: Record<string, unknown> = {};
 
     if (type === "my") {
-      whereClause.requesterId = session.user.id;
+      whereClause.requesterId = DEMO_USER.id;
     } else if (type === "open") {
       whereClause.status = "OPEN";
-      whereClause.requesterId = { not: session.user.id };
+      whereClause.requesterId = { not: DEMO_USER.id };
     } else if (type === "fulfilling") {
-      whereClause.fulfillerId = session.user.id;
+      whereClause.fulfillerId = DEMO_USER.id;
     }
 
     if (status) {
@@ -57,10 +52,17 @@ export async function GET(req: NextRequest) {
 // POST /api/requests - Create a new request
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Ensure demo user exists
+    await prisma.user.upsert({
+      where: { email: DEMO_USER.email },
+      update: {},
+      create: {
+        id: DEMO_USER.id,
+        email: DEMO_USER.email,
+        name: DEMO_USER.name,
+        role: DEMO_USER.role,
+      },
+    });
 
     // Check rate limit
     const today = new Date();
@@ -68,7 +70,7 @@ export async function POST(req: NextRequest) {
 
     const requestsToday = await prisma.request.count({
       where: {
-        requesterId: session.user.id,
+        requesterId: DEMO_USER.id,
         createdAt: { gte: today },
         status: { not: "CANCELLED" },
       },
@@ -106,7 +108,7 @@ export async function POST(req: NextRequest) {
 
     const request = await prisma.request.create({
       data: {
-        requesterId: session.user.id,
+        requesterId: DEMO_USER.id,
         locations: JSON.stringify(locations),
         timeWindowStart: new Date(timeWindowStart),
         timeWindowEnd: new Date(timeWindowEnd),

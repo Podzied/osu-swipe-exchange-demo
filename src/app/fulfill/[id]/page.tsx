@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -29,7 +28,6 @@ interface Request {
 export default function FulfillDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { data: session } = useSession();
   const [request, setRequest] = useState<Request | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -168,10 +166,8 @@ export default function FulfillDetailPage() {
   const startTime = new Date(request.timeWindowStart);
   const endTime = new Date(request.timeWindowEnd);
 
-  const isOwnRequest = request.requesterId === session?.user?.id;
-  const isClaimer = request.fulfillerId === session?.user?.id;
-  const canClaim = request.status === "OPEN" && !isOwnRequest;
-  const canFulfill = request.status === "CLAIMED" && isClaimer;
+  const canClaim = request.status === "OPEN";
+  const canFulfill = request.status === "CLAIMED";
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -197,7 +193,7 @@ export default function FulfillDetailPage() {
 
         <CardContent className="space-y-6">
           {/* Pickup Alias (shown after claim) */}
-          {isClaimer && request.status !== "OPEN" && (
+          {request.status !== "OPEN" && (
             <div className="p-4 bg-primary-50 rounded-lg border border-primary-200">
               <p className="text-sm text-primary-700 font-medium">
                 Pickup Code (Verify with requester)
@@ -365,7 +361,7 @@ export default function FulfillDetailPage() {
                 </Button>
               </>
             )}
-            {request.status === "FULFILLED" && isClaimer && (
+            {request.status === "FULFILLED" && (
               <div className="w-full text-center text-gray-600">
                 Waiting for requester to confirm receipt
               </div>
@@ -378,11 +374,6 @@ export default function FulfillDetailPage() {
               >
                 Back to Browse
               </Button>
-            )}
-            {isOwnRequest && (
-              <div className="w-full text-center text-gray-500">
-                You cannot fulfill your own request
-              </div>
             )}
           </div>
         </CardFooter>
