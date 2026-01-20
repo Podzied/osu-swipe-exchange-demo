@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { DEMO_USER } from "@/lib/demo-user";
+import { requests, getRequestWithRelations, getUser } from "@/lib/mock-data";
 
 // GET /api/requests/[id] - Get a single request
 export async function GET(
@@ -10,23 +9,26 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const request = await prisma.request.findUnique({
-      where: { id },
-      include: {
-        requester: {
-          select: { id: true, name: true, email: true },
-        },
-        fulfiller: {
-          select: { id: true, name: true, email: true },
-        },
-      },
-    });
+    const request = requests.find((r) => r.id === id);
 
     if (!request) {
       return NextResponse.json({ error: "Request not found" }, { status: 404 });
     }
 
-    return NextResponse.json(request);
+    const requester = getUser(request.requesterId);
+    const fulfiller = request.fulfillerId
+      ? getUser(request.fulfillerId)
+      : null;
+
+    return NextResponse.json({
+      ...request,
+      requester: requester
+        ? { id: requester.id, name: requester.name, email: requester.email }
+        : null,
+      fulfiller: fulfiller
+        ? { id: fulfiller.id, name: fulfiller.name, email: fulfiller.email }
+        : null,
+    });
   } catch (error) {
     console.error("Error fetching request:", error);
     return NextResponse.json(
@@ -46,13 +48,13 @@ export async function PATCH(
     const body = await req.json();
     const { action } = body;
 
-    const request = await prisma.request.findUnique({
-      where: { id },
-    });
+    const requestIndex = requests.findIndex((r) => r.id === id);
 
-    if (!request) {
+    if (requestIndex === -1) {
       return NextResponse.json({ error: "Request not found" }, { status: 404 });
     }
+
+    const request = requests[requestIndex];
 
     // Handle different actions
     switch (action) {
@@ -63,10 +65,7 @@ export async function PATCH(
             { status: 400 }
           );
         }
-        await prisma.request.update({
-          where: { id },
-          data: { status: "CANCELLED" },
-        });
+        request.status = "CANCELLED";
         break;
 
       case "complete":
@@ -76,10 +75,8 @@ export async function PATCH(
             { status: 400 }
           );
         }
-        await prisma.request.update({
-          where: { id },
-          data: { status: "COMPLETED", completedAt: new Date() },
-        });
+        request.status = "COMPLETED";
+        request.completedAt = new Date();
         break;
 
       case "release":
@@ -89,33 +86,16 @@ export async function PATCH(
             { status: 400 }
           );
         }
-        await prisma.request.update({
-          where: { id },
-          data: {
-            status: "OPEN",
-            fulfillerId: null,
-            claimedAt: null,
-          },
-        });
+        request.status = "OPEN";
+        request.fulfillerId = null;
+        request.claimedAt = null;
         break;
 
       default:
         return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
 
-    const updatedRequest = await prisma.request.findUnique({
-      where: { id },
-      include: {
-        requester: {
-          select: { id: true, name: true },
-        },
-        fulfiller: {
-          select: { id: true, name: true },
-        },
-      },
-    });
-
-    return NextResponse.json(updatedRequest);
+    return NextResponse.json(getRequestWithRelations(request));
   } catch (error) {
     console.error("Error updating request:", error);
     return NextResponse.json(

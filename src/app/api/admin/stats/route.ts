@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { requests, users, flags, getUser } from "@/lib/mock-data";
 
 export const dynamic = "force-dynamic";
 
@@ -13,40 +13,41 @@ export async function GET() {
     weekAgo.setDate(weekAgo.getDate() - 7);
 
     // Aggregate stats
-    const [
-      totalUsers,
-      totalRequests,
-      completedRequests,
-      pendingFlags,
-      todayRequests,
-      todayCompletions,
-      weeklyRequests,
-      statusCounts,
-    ] = await Promise.all([
-      prisma.user.count(),
-      prisma.request.count(),
-      prisma.request.count({ where: { status: "COMPLETED" } }),
-      prisma.flag.count({ where: { status: "PENDING" } }),
-      prisma.request.count({ where: { createdAt: { gte: today } } }),
-      prisma.request.count({
-        where: { status: "COMPLETED", completedAt: { gte: today } },
-      }),
-      prisma.request.count({ where: { createdAt: { gte: weekAgo } } }),
-      prisma.request.groupBy({
-        by: ["status"],
-        _count: { status: true },
-      }),
-    ]);
+    const totalUsers = users.length;
+    const totalRequests = requests.length;
+    const completedRequests = requests.filter(
+      (r) => r.status === "COMPLETED"
+    ).length;
+    const pendingFlags = flags.filter((f) => f.status === "PENDING").length;
+    const todayRequests = requests.filter((r) => r.createdAt >= today).length;
+    const todayCompletions = requests.filter(
+      (r) => r.status === "COMPLETED" && r.completedAt && r.completedAt >= today
+    ).length;
+    const weeklyRequests = requests.filter((r) => r.createdAt >= weekAgo).length;
+
+    // Status counts
+    const statusCountsMap: Record<string, number> = {};
+    requests.forEach((r) => {
+      statusCountsMap[r.status] = (statusCountsMap[r.status] || 0) + 1;
+    });
 
     // Recent activity
-    const recentRequests = await prisma.request.findMany({
-      take: 10,
-      orderBy: { createdAt: "desc" },
-      include: {
-        requester: { select: { name: true, email: true } },
-        fulfiller: { select: { name: true, email: true } },
-      },
-    });
+    const recentRequests = [...requests]
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, 10)
+      .map((r) => {
+        const requester = getUser(r.requesterId);
+        const fulfiller = r.fulfillerId ? getUser(r.fulfillerId) : null;
+        return {
+          ...r,
+          requester: requester
+            ? { name: requester.name, email: requester.email }
+            : null,
+          fulfiller: fulfiller
+            ? { name: fulfiller.name, email: fulfiller.email }
+            : null,
+        };
+      });
 
     return NextResponse.json({
       totalUsers,
@@ -56,9 +57,7 @@ export async function GET() {
       todayRequests,
       todayCompletions,
       weeklyRequests,
-      statusCounts: Object.fromEntries(
-        statusCounts.map((s) => [s.status, s._count.status])
-      ),
+      statusCounts: statusCountsMap,
       recentRequests,
     });
   } catch (error) {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { flags, users, generateId } from "@/lib/mock-data";
 
 export const dynamic = "force-dynamic";
 
@@ -9,17 +9,32 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
 
-    const flags = await prisma.flag.findMany({
-      where: status ? { status } : undefined,
-      orderBy: { createdAt: "desc" },
-      include: {
-        user: {
-          select: { id: true, name: true, email: true, status: true },
-        },
-      },
+    let filtered = [...flags];
+
+    if (status) {
+      filtered = filtered.filter((f) => f.status === status);
+    }
+
+    // Sort by createdAt desc
+    filtered.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    // Add user relations
+    const result = filtered.map((flag) => {
+      const user = users.find((u) => u.id === flag.userId);
+      return {
+        ...flag,
+        user: user
+          ? {
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              status: user.status,
+            }
+          : null,
+      };
     });
 
-    return NextResponse.json(flags);
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Error fetching flags:", error);
     return NextResponse.json(
@@ -35,13 +50,18 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { userId, type, reason } = body;
 
-    const flag = await prisma.flag.create({
-      data: {
-        userId,
-        type,
-        reason,
-      },
-    });
+    const flag = {
+      id: generateId(),
+      type,
+      reason,
+      status: "PENDING",
+      createdAt: new Date(),
+      resolvedAt: null,
+      resolution: null,
+      userId,
+    };
+
+    flags.push(flag);
 
     return NextResponse.json(flag, { status: 201 });
   } catch (error) {

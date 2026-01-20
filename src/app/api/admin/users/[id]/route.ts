@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { users, requests, flags } from "@/lib/mock-data";
 
 // GET /api/admin/users/[id] - Get user details
 export async function GET(
@@ -9,28 +9,39 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const user = await prisma.user.findUnique({
-      where: { id },
-      include: {
-        requests: {
-          orderBy: { createdAt: "desc" },
-          take: 20,
-        },
-        fulfillments: {
-          orderBy: { claimedAt: "desc" },
-          take: 20,
-        },
-        flags: {
-          orderBy: { createdAt: "desc" },
-        },
-      },
-    });
+    const user = users.find((u) => u.id === id);
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    return NextResponse.json(user);
+    // Get user's requests
+    const userRequests = requests
+      .filter((r) => r.requesterId === id)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, 20);
+
+    // Get user's fulfillments
+    const userFulfillments = requests
+      .filter((r) => r.fulfillerId === id)
+      .sort((a, b) => {
+        const aTime = a.claimedAt?.getTime() || 0;
+        const bTime = b.claimedAt?.getTime() || 0;
+        return bTime - aTime;
+      })
+      .slice(0, 20);
+
+    // Get user's flags
+    const userFlags = flags
+      .filter((f) => f.userId === id)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    return NextResponse.json({
+      ...user,
+      requests: userRequests,
+      fulfillments: userFulfillments,
+      flags: userFlags,
+    });
   } catch (error) {
     console.error("Error fetching user:", error);
     return NextResponse.json(
@@ -50,55 +61,40 @@ export async function PATCH(
     const body = await req.json();
     const { action, suspendDays, role } = body;
 
-    const user = await prisma.user.findUnique({ where: { id } });
+    const user = users.find((u) => u.id === id);
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
-
-    let updateData: Record<string, unknown> = {};
 
     switch (action) {
       case "suspend":
         const suspendedUntil = new Date();
         suspendedUntil.setDate(suspendedUntil.getDate() + (suspendDays || 7));
-        updateData = {
-          status: "SUSPENDED",
-          suspendedUntil,
-        };
+        user.status = "SUSPENDED";
+        user.suspendedUntil = suspendedUntil;
         break;
       case "unsuspend":
-        updateData = {
-          status: "ACTIVE",
-          suspendedUntil: null,
-        };
+        user.status = "ACTIVE";
+        user.suspendedUntil = null;
         break;
       case "ban":
-        updateData = {
-          status: "BANNED",
-        };
+        user.status = "BANNED";
         break;
       case "unban":
-        updateData = {
-          status: "ACTIVE",
-          suspendedUntil: null,
-        };
+        user.status = "ACTIVE";
+        user.suspendedUntil = null;
         break;
       case "setRole":
         if (role !== "USER" && role !== "ADMIN") {
           return NextResponse.json({ error: "Invalid role" }, { status: 400 });
         }
-        updateData = { role };
+        user.role = role;
         break;
       default:
         return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
 
-    const updatedUser = await prisma.user.update({
-      where: { id },
-      data: updateData,
-    });
-
-    return NextResponse.json(updatedUser);
+    return NextResponse.json(user);
   } catch (error) {
     console.error("Error updating user:", error);
     return NextResponse.json(

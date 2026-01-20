@@ -1,49 +1,40 @@
-import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { RequestCard } from "@/components/RequestCard";
 import { Button } from "@/components/ui/Button";
 import { DEMO_USER } from "@/lib/demo-user";
+import { requests } from "@/lib/mock-data";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  // Ensure demo user exists
-  await prisma.user.upsert({
-    where: { email: DEMO_USER.email },
-    update: {},
-    create: {
-      id: DEMO_USER.id,
-      email: DEMO_USER.email,
-      name: DEMO_USER.name,
-      role: DEMO_USER.role,
-    },
-  });
-
-  // Fetch user's requests
-  const myRequests = await prisma.request.findMany({
-    where: { requesterId: DEMO_USER.id },
-    orderBy: { createdAt: "desc" },
-    take: 10,
-  });
+  // Fetch user's requests from mock data
+  const myRequests = requests
+    .filter((r) => r.requesterId === DEMO_USER.id)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, 10);
 
   // Fetch requests user is fulfilling
-  const fulfilling = await prisma.request.findMany({
-    where: {
-      fulfillerId: DEMO_USER.id,
-      status: { in: ["CLAIMED", "FULFILLED"] },
-    },
-    orderBy: { claimedAt: "desc" },
-    take: 10,
-  });
+  const fulfilling = requests
+    .filter(
+      (r) =>
+        r.fulfillerId === DEMO_USER.id &&
+        ["CLAIMED", "FULFILLED"].includes(r.status)
+    )
+    .sort((a, b) => {
+      const aTime = a.claimedAt?.getTime() || 0;
+      const bTime = b.claimedAt?.getTime() || 0;
+      return bTime - aTime;
+    })
+    .slice(0, 10);
 
   // Stats
-  const totalRequests = await prisma.request.count({
-    where: { requesterId: DEMO_USER.id },
-  });
+  const totalRequests = requests.filter(
+    (r) => r.requesterId === DEMO_USER.id
+  ).length;
 
-  const totalFulfilled = await prisma.request.count({
-    where: { fulfillerId: DEMO_USER.id, status: "COMPLETED" },
-  });
+  const totalFulfilled = requests.filter(
+    (r) => r.fulfillerId === DEMO_USER.id && r.status === "COMPLETED"
+  ).length;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

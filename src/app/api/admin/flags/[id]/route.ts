@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { flags } from "@/lib/mock-data";
 
 // PATCH /api/admin/flags/[id] - Resolve a flag
 export async function PATCH(
@@ -15,14 +15,15 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    const flag = await prisma.flag.update({
-      where: { id },
-      data: {
-        status,
-        resolution,
-        resolvedAt: new Date(),
-      },
-    });
+    const flag = flags.find((f) => f.id === id);
+
+    if (!flag) {
+      return NextResponse.json({ error: "Flag not found" }, { status: 404 });
+    }
+
+    flag.status = status;
+    flag.resolution = resolution || null;
+    flag.resolvedAt = new Date();
 
     return NextResponse.json(flag);
   } catch (error) {

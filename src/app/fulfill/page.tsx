@@ -1,37 +1,22 @@
-import { prisma } from "@/lib/prisma";
 import { RequestCard } from "@/components/RequestCard";
-import { DEMO_USER } from "@/lib/demo-user";
+import { requests } from "@/lib/mock-data";
 
 export const dynamic = "force-dynamic";
 
 export default async function FulfillPage() {
-  // Ensure demo user exists
-  await prisma.user.upsert({
-    where: { email: DEMO_USER.email },
-    update: {},
-    create: {
-      id: DEMO_USER.id,
-      email: DEMO_USER.email,
-      name: DEMO_USER.name,
-      role: DEMO_USER.role,
-    },
-  });
+  // Fetch all open requests from mock data
+  const openRequests = requests
+    .filter((r) => r.status === "OPEN")
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()); // FIFO
 
-  // Fetch all open requests
-  const openRequests = await prisma.request.findMany({
-    where: {
-      status: "OPEN",
-    },
-    orderBy: { createdAt: "asc" }, // FIFO
-  });
-
-  // Fetch requests being fulfilled (by demo fulfiller)
-  const myFulfillments = await prisma.request.findMany({
-    where: {
-      status: { in: ["CLAIMED", "FULFILLED"] },
-    },
-    orderBy: { claimedAt: "desc" },
-  });
+  // Fetch requests being fulfilled
+  const myFulfillments = requests
+    .filter((r) => ["CLAIMED", "FULFILLED"].includes(r.status))
+    .sort((a, b) => {
+      const aTime = a.claimedAt?.getTime() || 0;
+      const bTime = b.claimedAt?.getTime() || 0;
+      return bTime - aTime;
+    });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
