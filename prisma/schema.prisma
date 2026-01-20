@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  name           String?
+  role           String    @default("USER") // USER, ADMIN
+  status         String    @default("ACTIVE") // ACTIVE, SUSPENDED, BANNED
+  suspendedUntil DateTime?
+  createdAt      DateTime  @default(now())
+
+  requests     Request[] @relation("Requester")
+  fulfillments Request[] @relation("Fulfiller")
+  flags        Flag[]
+}
+
+model Request {
+  id     String @id @default(cuid())
+  status String @default("OPEN") // OPEN, CLAIMED, FULFILLED, COMPLETED, EXPIRED, CANCELLED
+
+  // Location & Time
+  locations       String // JSON array of location IDs
+  timeWindowStart DateTime
+  timeWindowEnd   DateTime
+
+  // Delivery
+  deliveryMethod   String // PICKUP, DELIVERY
+  deliveryBuilding String?
+  deliveryNotes    String?
+
+  // Dietary
+  dietaryTags  String // JSON array
+  dietaryNotes String?
+
+  // Fulfillment
+  pickupAlias       String // Auto-generated
+  fulfilledLocation String?
+  grubhubOrderId    String?
+
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  claimedAt   DateTime?
+  fulfilledAt DateTime?
+  completedAt DateTime?
+  expiresAt   DateTime
+
+  // Relations
+  requesterId String
+  requester   User    @relation("Requester", fields: [requesterId], references: [id])
+  fulfillerId String?
+  fulfiller   User?   @relation("Fulfiller", fields: [fulfillerId], references: [id])
+}
+
+model Flag {
+  id         String    @id @default(cuid())
+  type       String // RAPID_REQUESTS, CLAIM_TIMEOUT, CONFIRMATION_REUSE, UNUSUAL_PATTERN
+  reason     String
+  status     String    @default("PENDING") // PENDING, DISMISSED, ACTIONED
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+  resolution String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+}
