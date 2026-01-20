@@ -15,12 +15,6 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    if (!email.endsWith("@osu.edu")) {
-      setError("Please use your @osu.edu email address");
-      setLoading(false);
-      return;
-    }
-
     const result = await signIn("credentials", {
       email,
       redirect: false,
@@ -43,7 +37,7 @@ export default function LoginPage() {
             Sign in to your account
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Use your OSU email to get started
+            Enter your email to get started
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -60,7 +54,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="appearance-none rounded-md relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-primary-500 focus:border-primary-500 focus:z-10 sm:text-sm"
-              placeholder="name.1@osu.edu"
+              placeholder="you@example.com"
             />
           </div>
 
@@ -79,7 +73,7 @@ export default function LoginPage() {
           </div>
 
           <p className="text-center text-xs text-gray-500">
-            This is a mock authentication. Any @osu.edu email will work.
+            Demo mode: Any email address will work.
           </p>
         </form>
       </div>

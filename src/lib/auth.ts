@@ -5,19 +5,14 @@ import { prisma } from "./prisma";
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Credentials({
-      name: "OSU Email",
+      name: "Email",
       credentials: {
-        email: { label: "Email", type: "email", placeholder: "name.1@osu.edu" },
+        email: { label: "Email", type: "email", placeholder: "you@example.com" },
       },
       async authorize(credentials) {
         const email = credentials?.email as string | undefined;
 
         if (!email) return null;
-
-        // Validate OSU email domain (mock auth)
-        if (!email.endsWith("@osu.edu")) {
-          return null;
-        }
 
         // Find or create user
         let user = await prisma.user.findUnique({
