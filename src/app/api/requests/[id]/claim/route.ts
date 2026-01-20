@@ -1,15 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { RATE_LIMITS, DINING_LOCATIONS } from "@/lib/constants";
-import { DEMO_USER } from "@/lib/demo-user";
-
-// Use a second demo user for fulfilling to show the flow
-const DEMO_FULFILLER = {
-  id: "demo-fulfiller-1",
-  email: "fulfiller@example.com",
-  name: "Demo Fulfiller",
-  role: "USER",
-};
+import { DINING_LOCATIONS } from "@/lib/constants";
+import { DEMO_FULFILLER } from "@/lib/demo-user";
 
 // POST /api/requests/[id]/claim - Claim or fulfill a request
 export async function POST(
