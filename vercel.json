@@ -1,4 +1,4 @@
 {
-  "buildCommand": "DATABASE_URL=\"postgresql://dummy:dummy@localhost:5432/dummy\" prisma generate && next build",
+  "buildCommand": "prisma generate && prisma db push --skip-generate && next build",
   "framework": "nextjs"
 }
